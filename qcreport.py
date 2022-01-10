@@ -2,6 +2,7 @@ import os
 import argparse
 import subprocess
 import pandas as pd
+import time
 
 
 # This function was written by Heng Li
@@ -45,6 +46,7 @@ parser.add_argument('-e', '--end-date', required=True, help='Maximum sequencing_
 parser.add_argument('-r', '--results-dir', help='Directory to save generated report and PNG files (default will be the directory STARTDATE_ENDDATE).')
 parser.add_argument('-t', '--temp-dir', default='.', help='Directory to save temporary files (default being the current directory).')
 args = parser.parse_args()
+start = time.time()
 
 
 # File prefix and temp file names
@@ -111,3 +113,7 @@ print("done.")
 print("Removing temporary files...", end=" ", flush=True)
 subprocess.run(['rm', filtered_metadata_path, filtered_multifasta_path, swell_filtered_multifasta_path])
 print("done.")
+
+
+end = time.time()
+print(f"Time taken: {int((end - start) // 60)} m {int((end - start) % 60)} s")
