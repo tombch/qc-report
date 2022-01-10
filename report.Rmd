@@ -1,0 +1,279 @@
+---
+title: "QC Report"
+output: pdf_document
+params:
+  swell_multifasta: swell_multifasta
+  date_filtered_metadata: date_filtered_metadata
+  start_date: start_date
+  end_date: end_date
+  date_string: date_string
+  results_dir: results_dir
+date: "`r params$date_string`"
+geometry: "left=1cm,right=1cm,top=1cm,bottom=2cm"
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, clean = TRUE)
+```
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+library(tidyverse)
+library(gridExtra)
+
+# No pdf generation
+pdf(NULL)
+
+# Read and prepare data
+
+start_date <- params$start_date
+end_date <- params$end_date
+results_dir <- params$results_dir
+swell <- read.table(params$swell_multifasta, head=TRUE, sep='\t', na.strings=c("NaN", "-"))
+metadata <- read.table(params$date_filtered_metadata, head=TRUE, sep='\t', fill=TRUE)
+lookup = read_tsv("collection_pillar.txt", col_types=cols(collection_pillar = col_double(), label = col_character()))
+
+df <- merge(x=swell, y=metadata, by.x="header", by.y="fasta_header")
+df$sequencing_submission_week = strftime(df$sequencing_submission_date, format="%y-%V")
+seq_org_codes <- unique(df$sequencing_org_code)
+df = df %>% 
+    inner_join(lookup) %>%
+    mutate(label = ifelse(sequencing_org_code == 'PHWC', 'Wales', label)) %>%
+    mutate(label = ifelse(sequencing_org_code %in% c('EDIN', 'GLAS'), 'Scotland', label)) %>%
+    mutate(label = ifelse(sequencing_org_code %in% c('NIRE'), 'N. Ireland', label)) %>%
+    mutate(label = ifelse(sequencing_org_code == 'SANG', 'Pillar 2', label))
+
+# Settings
+alpha_val = 0.4 # Point opacity parameter
+prefix = paste(results_dir, '/', paste(start_date, end_date, sep="_"), sep="") # File name prefix
+w = 10 # PNG width
+h = 4 # PNG height
+
+# Nick graphs
+# Samples by date, fill by label
+samples_by_date = df %>%
+    ggplot(aes(x=sequencing_submission_date, fill=label)) + 
+    geom_bar() + 
+    xlab("Samples processed by sequencing_submission_date") + 
+    theme_bw()
+ggsave(paste(prefix, "samples_by_publication_date.png", sep="_"), samples_by_date, width=w, height=h)
+
+# Total samples by week, split by label 
+totals_by_week = df %>%
+   group_by(label, sequencing_submission_week) %>%
+   summarise(n=n()) %>%
+   pivot_wider(names_from=c('label'), values_from=c('n')) %>%
+   replace_na(list(`N. Ireland`=0, `Pillar 1`=0, `Pillar 2`=0, `Scotland`=0, `Unknown`=0, Wales=0)) %>%
+   mutate(total=Commercial+`N. Ireland`+`Pillar 1`+`Pillar 2`+Scotland+Unknown+Wales) %>%
+   pivot_longer(cols=2:9) %>%
+   ggplot(aes(x=sequencing_submission_week, y=value, group=name, color=name)) +
+   geom_line() + 
+   theme_bw()
+ggsave(paste(prefix, "totals_by_week.png", sep="_"), totals_by_week, width=w, height=h)
+
+# Total samples by week, faceted by label
+totals_by_label = df %>%
+   group_by(label, sequencing_org_code, sequencing_submission_week) %>%
+   summarise(n=n()) %>%
+   ggplot(aes(x=sequencing_submission_week, y=n, color=sequencing_org_code, group=sequencing_org_code)) +
+   geom_line(size=1) +  
+   geom_point(size=2) +
+   facet_wrap(~label, scale="free_y", ncol=1) +
+   theme_bw() +
+   theme(legend.position="bottom")
+ggsave(paste(prefix, "totals_by_label.png", sep="_"), totals_by_label, width=w, height=h)
+
+# Totals by private provider
+totals_by_pp = df %>%
+   filter(!is.na(`meta.phe.private-provider`)) %>%
+   group_by(label, `meta.phe.private-provider`, sequencing_submission_week) %>%
+   summarise(n=n()) %>%
+   ggplot(aes(x=sequencing_submission_week, y=n, color=`meta.phe.private-provider`, group=`meta.phe.private-provider`)) +
+   geom_line(size=1) +
+   geom_point(size=2) +
+   facet_wrap(~label, scale="free_y", ncol=1) +
+   theme_bw() +
+   theme(legend.position="bottom")
+ggsave(paste(prefix, "totals_by_pp.png", sep="_"), totals_by_pp, width=w, height=h)
+
+# Other graphs
+# Average pc_acgt per ISO week, coloured by sequencing org
+acgt_iso = df %>% 
+    filter(!sequencing_org_code %in% c('LOND_BART', 'TFCI', 'CAMB')) %>% 
+    ggplot(aes(x = sequencing_submission_week, y = pc_acgt, colour = sequencing_org_code)) + 
+    geom_point(stat = "summary", fun = "mean") + 
+    geom_line(stat = "summary", fun = "mean", aes(group=sequencing_org_code)) + 
+    labs(y = "avg pc_acgt") +
+    theme(legend.position = "bottom", legend.title = element_blank()) +
+    ggtitle("Completeness")
+# Average pc_ambiguous per ISO week, coloured by sequencing org
+ambig_iso = df %>% 
+    filter(!sequencing_org_code %in% c('LOND_BART', 'TFCI', 'CAMB')) %>% 
+    ggplot(aes(x = sequencing_submission_week, y = pc_ambiguous, colour = sequencing_org_code)) + 
+    geom_point(stat = "summary", fun = "mean") + 
+    geom_line(stat = "summary", fun = "mean", aes(group=sequencing_org_code)) + 
+    labs(y = "avg pc_ambiguous") +
+    theme(legend.position = "bottom", legend.title = element_blank()) + 
+    ggtitle("Mixed bases")
+# Organise into grid
+iso = grid.arrange(acgt_iso, ambig_iso, ncol=2, nrow=1)
+ggsave(paste(prefix, "iso_week.png", sep="_"), iso, width=w, height=h)
+
+# Percentage acgt histogram, faceted by sequencing org
+acgt_hist = ggplot(data = df, mapping = aes(x = pc_acgt)) +
+    geom_histogram() + 
+    facet_wrap(. ~ sequencing_org_code, ncol=3, scale="free_y") + 
+    theme_bw() +
+    ggtitle("Completeness")
+# Percentage ambiguous histogram, faceted by sequencing org
+ambig_hist = ggplot(data = df, mapping = aes(x = pc_ambiguous)) +
+    geom_histogram() +
+    facet_wrap(. ~ sequencing_org_code, ncol=3, scale="free_y") + 
+    theme_bw() +
+    ggtitle("Mixed bases")
+hist = grid.arrange(acgt_hist, ambig_hist, ncol=2, nrow=1)
+ggsave(paste(prefix, "hist.png", sep="_"), hist, width=w, height=h)
+
+# Percentage acgt scatterplot, faceted by sequencing org
+acgt_scatter = ggplot(data = df, mapping = aes(x = pc_acgt, y = 0)) +
+    geom_jitter(width = 0, alpha = alpha_val) +
+    facet_wrap(. ~ sequencing_org_code, ncol=3, scale="free_y") + 
+    scale_y_continuous(breaks = NULL) +
+    theme_bw() +
+    theme(axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank(), panel.grid.major.y=element_blank()) +
+    ggtitle("Completeness")
+# Percentage ambiguous scatterplot, faceted by sequencing org
+ambig_scatter = ggplot(data = df, mapping = aes(x = pc_ambiguous, y = 0)) +
+    geom_jitter(width = 0, alpha = alpha_val) +
+    facet_wrap(. ~ sequencing_org_code, ncol=3, scale="free_y") + 
+    scale_y_continuous(breaks = NULL) +
+    theme_bw() +
+    theme(axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank(), panel.grid.major.y=element_blank()) +
+    ggtitle("Mixed bases")
+# Organise into grid
+scatter = grid.arrange(acgt_scatter, ambig_scatter, ncol=2, nrow=1)
+ggsave(paste(prefix, "scatter.png", sep="_"), scatter, width=w, height=h)
+
+# Percentage acgt scatterplot, week on y axis, faceted by sequencing org
+acgt_scatter_week = ggplot(data = df, mapping = aes(x = pc_acgt, y = sequencing_submission_week)) +
+    geom_jitter(width = 0, alpha = alpha_val) +
+    facet_wrap(. ~ sequencing_org_code, ncol=3, scale="free_y") + 
+    theme_bw() +
+    ggtitle("Completeness")
+# Percentage ambiguous scatterplot, week on y axis, faceted by sequencing org
+ambig_scatter_week = ggplot(data = df, mapping = aes(x = pc_ambiguous, y = sequencing_submission_week)) +
+    geom_jitter(width = 0, alpha = alpha_val) +
+    facet_wrap(. ~ sequencing_org_code, ncol=3, scale="free_y") + 
+    theme_bw() +
+    ggtitle("Mixed bases")
+scatter_week = grid.arrange(acgt_scatter_week, ambig_scatter_week, ncol=2, nrow=1)
+ggsave(paste(prefix, "scatter_week.png", sep="_"), scatter_week, width=w, height=h)
+
+# Percentage acgt on y axis, sequencing org on x axis
+acgt_scatter_seq = ggplot(data = df, mapping = aes(x = sequencing_org_code, y = pc_acgt)) +
+    geom_point(alpha = alpha_val) + 
+    theme_bw() +
+    ggtitle("Completeness")
+# Percentage ambiguous on y axis, sequencing org on x axis
+ambig_scatter_seq = ggplot(data = df, mapping = aes(x = sequencing_org_code, y = pc_ambiguous)) +
+    geom_point(alpha = alpha_val) + 
+    theme_bw() +
+    ggtitle("Mixed bases")
+# Organise into grid
+scatter_seq = grid.arrange(acgt_scatter_seq, ambig_scatter_seq, ncol=2, nrow=1)
+ggsave(paste(prefix, "scatter_seq.png", sep="_"), scatter_seq, width=w, height=h)
+
+# Percentage acgt boxplot, sequencing org on x axis
+acgt_boxplot = ggplot(data = df, mapping = aes(x = sequencing_org_code, y = pc_acgt)) +
+    geom_boxplot() + 
+    theme_bw() +
+    ggtitle("Completeness")
+# Percentage ambiguous boxplot, sequencing org on x axis
+ambig_boxplot = ggplot(data = df, mapping = aes(x = sequencing_org_code, y = pc_ambiguous)) +
+    geom_boxplot() + 
+    theme_bw() +
+    ggtitle("Mixed bases")
+# Organise into grid
+boxplot = grid.arrange(acgt_boxplot, ambig_boxplot, ncol=2, nrow=1)
+ggsave(paste(prefix, "boxplot.png", sep="_"), boxplot, width=w, height=h)
+
+for (code in seq_org_codes) {
+    code_df <- filter(df, sequencing_org_code == code)
+    runs <- sort(unique(code_df$run_name), decreasing = FALSE)
+
+    # Average pc_acgt per ISO week, coloured by sequencing org
+    acgt_iso_runs = ggplot(data = code_df, mapping = aes(x = sequencing_submission_week, y = pc_acgt, group = run_name)) + 
+        geom_point(stat = "summary", fun = "mean") + 
+        geom_line(stat = "summary", fun = "mean") + 
+        labs(y = "average pc_acgt") +
+        ggtitle(paste("Completeness", "(", code, ")"))
+    # Average pc_ambiguous per ISO week, coloured by run_name
+    ambig_iso_runs = ggplot(data = code_df, mapping = aes(x = sequencing_submission_week, y = pc_ambiguous, group = run_name)) + 
+        geom_point(stat = "summary", fun = "mean") + 
+        geom_line(stat = "summary", fun = "mean") + 
+        labs(y = "average pc_ambiguous") +
+        ggtitle(paste("Mixed bases", "(", code, ")"))
+    # Organise into grid
+    iso_runs = grid.arrange(acgt_iso_runs, ambig_iso_runs, ncol=2, nrow=1)
+    ggsave(paste(prefix, code, "runs_iso_week.png", sep="_"), iso_runs, width=w, height=h)
+
+    # Percentage acgt violin, ISO week on x axis
+    acgt_violin_iso = ggplot(data = code_df, mapping = aes(x = sequencing_submission_week, y = pc_acgt)) +
+        geom_violin() + 
+        theme_bw() +
+        ggtitle(paste("Completeness", "(", code, ")"))
+    # Percentage ambiguous violin, ISO week on x axis
+    ambig_violin_iso = ggplot(data = code_df, mapping = aes(x = sequencing_submission_week, y = pc_ambiguous)) +
+        geom_violin() + 
+        theme_bw() +
+        ggtitle(paste("Mixed bases", "(", code, ")"))
+    # Organise into grid
+    violin_iso = grid.arrange(acgt_violin_iso, ambig_violin_iso, ncol=2, nrow=1)
+    ggsave(paste(prefix, code, "violin_iso_week.png", sep="_"), violin_iso, width=w, height=h)
+
+    # Percentage acgt boxplot, ISO week on x axis
+    acgt_boxplot_iso = ggplot(data = code_df, mapping = aes(x = sequencing_submission_week, y = pc_acgt)) +
+        geom_boxplot() + 
+        theme_bw() +
+        ggtitle(paste("Completeness", "(", code, ")"))
+    # Percentage ambiguous boxplot, ISO week on x axis
+    ambig_boxplot_iso = ggplot(data = code_df, mapping = aes(x = sequencing_submission_week, y = pc_ambiguous)) +
+        geom_boxplot() + 
+        theme_bw() +
+        ggtitle(paste("Mixed bases", "(", code, ")"))
+    # Organise into grid
+    boxplot_iso = grid.arrange(acgt_boxplot_iso, ambig_boxplot_iso, ncol=2, nrow=1)
+    ggsave(paste(prefix, code, "boxplot_iso_week.png", sep="_"), boxplot_iso, width=w, height=h)
+}
+```
+
+# Genome completeness & mixed bases
+
+## Summary
+
+![](`r paste(prefix, "iso_week.png", sep="_")`)
+
+![](`r paste(prefix, "hist.png", sep="_")`)
+
+![](`r paste(prefix, "scatter.png", sep="_")`)
+
+![](`r paste(prefix, "scatter_week.png", sep="_")`)
+
+![](`r paste(prefix, "scatter_seq.png", sep="_")`)
+
+![](`r paste(prefix, "boxplot.png", sep="_")`)
+
+##
+
+```{r, echo=FALSE, results='hide', message=FALSE, out.width="100%", results="asis"}
+
+# It just works
+for (code in seq_org_codes) {
+    graph_iso <- paste(prefix, code, "runs_iso_week.png", sep="_")
+    graph_violin <- paste(prefix, code, "violin_iso_week.png", sep="_")
+    graph_box <- paste(prefix, code, "boxplot_iso_week.png", sep="_")
+    cat("  \n##", code, "  \n")
+    cat("![](", graph_iso, ")  \n")
+    cat("![](", graph_violin, ")  \n")
+    cat("![](", graph_box, ")  \n")
+}
+```
