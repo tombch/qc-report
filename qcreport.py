@@ -63,7 +63,7 @@ if not os.path.isdir(results_dir):
 
 
 print("Reading metadata...", end=" ", flush=True)
-metadata = pd.read_csv(args.metadata, sep="\t")
+metadata = pd.read_csv(args.metadata, sep="\t", low_memory=False)
 metadata["sequencing_submission_date"] = pd.to_datetime(metadata["sequencing_submission_date"], errors="coerce")
 print("done.")
 
