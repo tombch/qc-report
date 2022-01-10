@@ -54,46 +54,49 @@ samples_by_date = df %>%
     ggplot(aes(x=sequencing_submission_date, fill=label)) + 
     geom_bar() + 
     xlab("Samples processed by sequencing_submission_date") + 
-    theme_bw()
+    theme_bw() +
+    theme(legend.position="bottom")
 ggsave(paste(prefix, "samples_by_publication_date.png", sep="_"), samples_by_date, width=w, height=h)
-
-# Total samples by week, split by label 
+# Samples by week, split by label 
 totals_by_week = df %>%
-   group_by(label, sequencing_submission_week) %>%
-   summarise(n=n()) %>%
-   pivot_wider(names_from=c('label'), values_from=c('n')) %>%
-   replace_na(list(`N. Ireland`=0, `Pillar 1`=0, `Pillar 2`=0, `Scotland`=0, `Unknown`=0, Wales=0)) %>%
-   mutate(total=Commercial+`N. Ireland`+`Pillar 1`+`Pillar 2`+Scotland+Unknown+Wales) %>%
-   pivot_longer(cols=2:9) %>%
-   ggplot(aes(x=sequencing_submission_week, y=value, group=name, color=name)) +
-   geom_line() + 
-   theme_bw()
+    group_by(label, sequencing_submission_week) %>%
+    summarise(n=n()) %>%
+    ggplot(aes(x=sequencing_submission_week, y=n, colour=label, group=label)) + 
+    geom_line(size=1) +  
+    geom_point(size=2) +
+    theme_bw() +
+    theme(legend.position="bottom")
 ggsave(paste(prefix, "totals_by_week.png", sep="_"), totals_by_week, width=w, height=h)
+# Organise into grid
+samples = grid.arrange(samples_by_date, totals_by_week, ncol=2, nrow=1)
+ggsave(paste(prefix, "samples_by_date_and_week.png", sep="_"), samples, width=w, height=h)
 
-# Total samples by week, faceted by label
-totals_by_label = df %>%
-   group_by(label, sequencing_org_code, sequencing_submission_week) %>%
-   summarise(n=n()) %>%
-   ggplot(aes(x=sequencing_submission_week, y=n, color=sequencing_org_code, group=sequencing_org_code)) +
-   geom_line(size=1) +  
-   geom_point(size=2) +
-   facet_wrap(~label, scale="free_y", ncol=1) +
-   theme_bw() +
-   theme(legend.position="bottom")
-ggsave(paste(prefix, "totals_by_label.png", sep="_"), totals_by_label, width=w, height=h)
-
+# Totals by sequencing org
+totals_by_seq = df %>%
+    group_by(label, sequencing_org_code, sequencing_submission_week) %>%
+    summarise(n=n()) %>%
+    ggplot(aes(x=sequencing_submission_week, y=n, color=sequencing_org_code, group=sequencing_org_code)) +
+    geom_line(size=1) +  
+    geom_point(size=2) +
+    facet_wrap(~label, scale="free_y", ncol=1) +
+    theme_bw() +
+    theme(legend.position="bottom")
+ggsave(paste(prefix, "totals_by_seq.png", sep="_"), totals_by_seq, width=w, height=h)
 # Totals by private provider
 totals_by_pp = df %>%
-   filter(!is.na(`meta.phe.private-provider`)) %>%
-   group_by(label, `meta.phe.private-provider`, sequencing_submission_week) %>%
-   summarise(n=n()) %>%
-   ggplot(aes(x=sequencing_submission_week, y=n, color=`meta.phe.private-provider`, group=`meta.phe.private-provider`)) +
-   geom_line(size=1) +
-   geom_point(size=2) +
-   facet_wrap(~label, scale="free_y", ncol=1) +
-   theme_bw() +
-   theme(legend.position="bottom")
+    filter(!is.na(meta.phe.private.provider)) %>%
+    group_by(label, meta.phe.private.provider, sequencing_submission_week) %>%
+    summarise(n=n()) %>%
+    ggplot(aes(x=sequencing_submission_week, y=n, color=meta.phe.private.provider, group=meta.phe.private.provider)) +
+    geom_line(size=1) +
+    geom_point(size=2) +
+    facet_wrap(~label, scale="free_y", ncol=1) +
+    theme_bw() +
+    theme(legend.position="bottom")
 ggsave(paste(prefix, "totals_by_pp.png", sep="_"), totals_by_pp, width=w, height=h)
+# Organise into grid
+totals = grid.arrange(totals_by_seq, totals_by_pp, ncol=2, nrow=1)
+ggsave(paste(prefix, "totals_by_seq_and_pp.png"), totals, width=w, height=h)
 
 # Other graphs
 # Average pc_acgt per ISO week, coloured by sequencing org
@@ -246,9 +249,13 @@ for (code in seq_org_codes) {
 }
 ```
 
-# Genome completeness & mixed bases
+# Processed genomes
 
-## Summary
+![](`r paste(prefix, "samples_by_date_and_week.png", sep="_")`)
+
+![](`r paste(prefix, "totals_by_seq_and_pp.png")`)
+
+# Genome completeness & mixed bases
 
 ![](`r paste(prefix, "iso_week.png", sep="_")`)
 
@@ -261,8 +268,6 @@ for (code in seq_org_codes) {
 ![](`r paste(prefix, "scatter_seq.png", sep="_")`)
 
 ![](`r paste(prefix, "boxplot.png", sep="_")`)
-
-##
 
 ```{r, echo=FALSE, results='hide', message=FALSE, out.width="100%", results="asis"}
 
