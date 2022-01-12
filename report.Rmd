@@ -1,5 +1,4 @@
 ---
-title: "QC Report"
 output: pdf_document
 params:
   swell_multifasta: swell_multifasta
@@ -8,6 +7,7 @@ params:
   end_date: end_date
   date_string: date_string
   results_dir: results_dir
+title: "QC Report"
 date: "`r params$date_string`"
 geometry: "left=1cm,right=1cm,top=1cm,bottom=2cm"
 ---
@@ -20,11 +20,10 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE, clean = TRUE)
 library(tidyverse)
 library(gridExtra)
 
-# No pdf generation
+# Prevent Rplots.pdf generation
 pdf(NULL)
 
 # Read and prepare data
-
 start_date <- params$start_date
 end_date <- params$end_date
 results_dir <- params$results_dir
@@ -218,14 +217,14 @@ for (code in seq_org_codes) {
     code_df <- filter(df, sequencing_org_code == code)
     runs <- sort(unique(code_df$run_name), decreasing = FALSE)
 
-    # Average pc_acgt per ISO week, coloured by sequencing org
+    # Average pc_acgt per ISO week for runs
     acgt_iso_runs = ggplot(data = code_df, mapping = aes(x = sequencing_submission_week, y = pc_acgt, group = run_name)) + 
         geom_point(stat = "summary", fun = "mean") + 
         geom_line(stat = "summary", fun = "mean") + 
         labs(y = "average pc_acgt") +
         theme(plot.title.position = "plot") +
         ggtitle(paste("Completeness", "(", code, ")"))
-    # Average pc_ambiguous per ISO week, coloured by run_name
+    # Average pc_ambiguous per ISO week for runs
     ambig_iso_runs = ggplot(data = code_df, mapping = aes(x = sequencing_submission_week, y = pc_ambiguous, group = run_name)) + 
         geom_point(stat = "summary", fun = "mean") + 
         geom_line(stat = "summary", fun = "mean") + 
@@ -278,7 +277,7 @@ for (code in seq_org_codes) {
 
 ![](`r paste(prefix, "totals_by_seq_and_pp.png")`)
 
-# Genome completeness & mixed bases
+# Genome completeness \& mixed bases
 
 ![](`r paste(prefix, "iso_week.png", sep="_")`)
 

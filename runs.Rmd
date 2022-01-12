@@ -1,0 +1,104 @@
+---
+output: pdf_document
+params:
+  code: code
+  swell_multifasta: swell_multifasta
+  date_filtered_metadata: date_filtered_metadata
+  date_prefix: date_prefix
+  date_string: date_string
+  org_dir: org_dir
+title: "`r params$code`"
+date: "`r params$date_string`"
+geometry: "left=1cm,right=1cm,top=1cm,bottom=2cm"
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, clean = TRUE)
+```
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+library(tidyverse)
+library(gridExtra)
+
+# Prevent Rplots.pdf generation
+pdf(NULL)
+
+# Read and prepare data
+code <- params$code
+org_dir <- params$org_dir
+date_prefix <- params$date_prefix
+swell <- read.table(params$swell_multifasta, head=TRUE, sep='\t', na.strings=c("NaN", "-"))
+metadata <- read.table(params$date_filtered_metadata, head=TRUE, sep='\t', fill=TRUE)
+
+df <- merge(x=swell, y=metadata, by.x="header", by.y="fasta_header") %>% filter(sequencing_org_code == code)
+df$sequencing_submission_date <- as.Date(df$sequencing_submission_date)
+df$sequencing_submission_week <- strftime(df$sequencing_submission_date, format="%y-%V")
+runs <- sort(unique(df$run_name), decreasing = FALSE)
+
+# Settings
+alpha_val = 0.4 # Point opacity parameter
+prefix = paste(org_dir, '/', date_prefix, '_', code, sep="") # File name prefix
+w = 10 # PNG width
+h = 4 # PNG height
+
+# Average pc_acgt per ISO week for runs
+acgt_iso_runs = ggplot(data = df, mapping = aes(x = sequencing_submission_week, y = pc_acgt, group = run_name)) + 
+    geom_point(stat = "summary", fun = "mean") + 
+    geom_line(stat = "summary", fun = "mean") + 
+    labs(y = "average pc_acgt") +
+    theme(plot.title.position = "plot") +
+    ggtitle(paste("Completeness", "(", code, ")"))
+# Average pc_ambiguous per ISO week for runs
+ambig_iso_runs = ggplot(data = df, mapping = aes(x = sequencing_submission_week, y = pc_ambiguous, group = run_name)) + 
+    geom_point(stat = "summary", fun = "mean") + 
+    geom_line(stat = "summary", fun = "mean") + 
+    labs(y = "average pc_ambiguous") +
+    theme(plot.title.position = "plot") +
+    ggtitle(paste("Mixed bases", "(", code, ")"))
+# Organise into grid
+iso_runs = grid.arrange(acgt_iso_runs, ambig_iso_runs, ncol=2, nrow=1)
+ggsave(paste(prefix, "runs_iso_week.png", sep="_"), iso_runs, width=w, height=h)
+
+for (run in runs) {
+    run_df <- filter(df, run_name == run)
+    # Percentage acgt scatterplot
+    p1 = ggplot(data = run_df, mapping = aes(x = pc_acgt, y = 0)) +
+        geom_jitter(width = 0, alpha = alpha_val) +
+        scale_y_continuous(breaks = NULL) +
+        theme_bw() +
+        theme(axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank(), panel.grid.major.y=element_blank())
+    # Percentage acgt histogram
+    p2 = ggplot(data = run_df, mapping = aes(x = pc_acgt)) +
+        geom_histogram() + 
+        theme_bw()
+    # Percentage ambiguous scatterplot
+    p3 = ggplot(data = run_df, mapping = aes(x = pc_ambiguous, y = 0)) +
+        geom_jitter(width = 0, alpha = alpha_val) +
+        scale_y_continuous(breaks = NULL) +
+        theme_bw() +
+        theme(axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank(), panel.grid.major.y=element_blank())
+    # Percentage ambiguous histogram
+    p4 = ggplot(data = run_df, mapping = aes(x = pc_ambiguous)) +
+        geom_histogram() +
+        theme_bw()
+    # Organise into grid
+    p = grid.arrange(p1, p2, p3, p4, ncol=2, nrow=2, top = run)
+    ggsave(paste(prefix, run, ".png", sep="_"), p, width=8, height=8)
+}
+```
+
+# Run completeness \& mixed bases by week
+
+![](`r paste(prefix, "runs_iso_week.png", sep="_")`)
+
+# Genome completeness \& mixed bases
+
+```{r, echo=FALSE, results='hide', message=FALSE, out.width="100%", results="asis"}
+
+# It just works
+for (run in runs) {
+    p <- paste(prefix, run, ".png", sep="_")
+    cat("  \n##", run, "  \n")
+    cat("![](", p, ")  \n")
+}
+```
