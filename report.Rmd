@@ -27,8 +27,8 @@ pdf(NULL)
 start_date <- params$start_date
 end_date <- params$end_date
 results_dir <- params$results_dir
-swell <- read.table(params$swell_multifasta, head=TRUE, sep='\t', na.strings=c("NaN", "-"))
-metadata <- read.table(params$date_filtered_metadata, head=TRUE, sep='\t', fill=TRUE)
+swell <- read_tsv(params$swell_multifasta)
+metadata <- read_tsv(params$date_filtered_metadata)
 lookup = read_tsv("collection_pillar.txt", col_types=cols(collection_pillar = col_double(), label = col_character()))
 
 df <- merge(x=swell, y=metadata, by.x="header", by.y="fasta_header")
@@ -83,10 +83,10 @@ totals_by_seq = df %>%
     ggtitle("Totals by sequencing org")
 # Totals by private provider
 totals_by_pp = df %>%
-    filter(!is.na(meta.phe.private.provider)) %>%
-    group_by(label, meta.phe.private.provider, sequencing_submission_week) %>%
+    filter(!is.na(`meta.phe.private-provider`)) %>%
+    group_by(label, `meta.phe.private-provider`, sequencing_submission_week) %>%
     summarise(n=n()) %>%
-    ggplot(aes(x=sequencing_submission_week, y=n, color=meta.phe.private.provider, group=meta.phe.private.provider)) +
+    ggplot(aes(x=sequencing_submission_week, y=n, color=`meta.phe.private-provider`, group=`meta.phe.private-provider`)) +
     geom_line(size=1) +
     geom_point(size=2) +
     facet_wrap(~label, scale="free_y", ncol=1) +
