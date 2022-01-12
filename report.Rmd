@@ -277,7 +277,7 @@ for (code in seq_org_codes) {
 
 ![](`r paste(prefix, "totals_by_week.png", sep="_")`)
 
-![](`r paste(prefix, "totals_by_seq_and_pp.png")`)
+![](`r paste(prefix, "totals_by_seq_and_pp.png", sep="_")`)
 
 ![](`r paste(prefix, "iso_week.png", sep="_")`)
 
