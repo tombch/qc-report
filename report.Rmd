@@ -291,8 +291,6 @@ for (code in seq_org_codes) {
 
 ![](`r paste(prefix, "boxplot.png", sep="_")`)
 
-## 
-
 ```{r, echo=FALSE, results='hide', message=FALSE, out.width="100%", results="asis"}
 
 # It just works
