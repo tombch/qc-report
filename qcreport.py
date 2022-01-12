@@ -124,8 +124,6 @@ if args.make_run_pdfs:
             subprocess.run(['mkdir', org_dir])
         runs_dest = f"{org_dir}/{args.start_date}_{args.end_date}_{code}.pdf"
         subprocess.run(['Rscript', '-e', f'rmarkdown::render(\'runs.Rmd\', output_file = "{runs_dest}", params=list(code = \'{code}\', swell_multifasta = \'{swell_filtered_multifasta_path}\', date_filtered_metadata = \'{filtered_metadata_path}\', date_prefix = \'{date_prefix}\', date_string = \'{date_string}\', org_dir = \'{org_dir}\'))'])
-    # Generate the PDFs
-    # subprocess.run(['Rscript', 'runs.R', code, swell_filtered_multifasta_path, filtered_metadata_path, org_dir, date_prefix])
     print("done.")
 
 
