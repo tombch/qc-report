@@ -96,7 +96,7 @@ totals_by_pp = df %>%
     ggtitle("Totals by private provider")
 # Organise into grid
 totals = grid.arrange(totals_by_seq, totals_by_pp, ncol=2, nrow=1)
-ggsave(paste(prefix, "totals_by_seq_and_pp.png"), totals, width=w, height=w)
+ggsave(paste(prefix, "totals_by_seq_and_pp.png", sep="_"), totals, width=w, height=w)
 
 # Other graphs
 # Average pc_acgt per ISO week, coloured by sequencing org
