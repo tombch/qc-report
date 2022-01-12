@@ -79,7 +79,7 @@ totals_by_seq = df %>%
     facet_wrap(~label, scale="free_y", ncol=1) +
     theme_bw() +
     theme(legend.position="bottom", plot.title.position = "plot") +
-    guides(colour=guide_legend(nrow=5)) +
+    guides(colour=guide_legend(nrow=6)) +
     ggtitle("Totals by sequencing org")
 # Totals by private provider
 totals_by_pp = df %>%
@@ -92,7 +92,7 @@ totals_by_pp = df %>%
     facet_wrap(~label, scale="free_y", ncol=1) +
     theme_bw() +
     theme(legend.position="bottom", plot.title.position = "plot") +
-    guides(colour=guide_legend(nrow=5)) +
+    guides(colour=guide_legend(nrow=6)) +
     ggtitle("Totals by private provider")
 # Organise into grid
 totals = grid.arrange(totals_by_seq, totals_by_pp, ncol=2, nrow=1)
