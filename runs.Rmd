@@ -27,8 +27,8 @@ pdf(NULL)
 code <- params$code
 org_dir <- params$org_dir
 date_prefix <- params$date_prefix
-swell <- read.table(params$swell_multifasta, head=TRUE, sep='\t', na.strings=c("NaN", "-"))
-metadata <- read.table(params$date_filtered_metadata, head=TRUE, sep='\t', fill=TRUE)
+swell <- read_tsv(params$swell_multifasta)
+metadata <- read_tsv(params$date_filtered_metadata)
 
 df <- merge(x=swell, y=metadata, by.x="header", by.y="fasta_header") %>% filter(sequencing_org_code == code)
 df$sequencing_submission_date <- as.Date(df$sequencing_submission_date)
@@ -93,7 +93,7 @@ for (run in runs) {
 
 # Genome completeness \& mixed bases
 
-```{r, echo=FALSE, results='hide', message=FALSE, out.width="100%", results="asis"}
+```{r, echo=FALSE, results='hide', message=FALSE, results="asis"}
 
 # It just works
 for (run in runs) {
