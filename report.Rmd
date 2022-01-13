@@ -298,7 +298,7 @@ for (code in seq_org_codes) {
     graph_iso <- paste(prefix, code, "runs_iso_week.png", sep="_")
     graph_violin <- paste(prefix, code, "violin_iso_week.png", sep="_")
     graph_box <- paste(prefix, code, "boxplot_iso_week.png", sep="_")
-    cat("  \n##", code, "  \n")
+    cat("  \n## ", code, "  \n")
     cat("![](", graph_iso, ")  \n")
     cat("![](", graph_violin, ")  \n")
     cat("![](", graph_box, ")  \n")

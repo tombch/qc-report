@@ -98,7 +98,7 @@ for (run in runs) {
 # It just works
 for (run in runs) {
     p <- paste(prefix, run, ".png", sep="_")
-    cat("  \n##", run, "  \n")
+    cat("  \n## ", run, "  \n")
     cat("![](", p, ")  \n")
 }
 ```
